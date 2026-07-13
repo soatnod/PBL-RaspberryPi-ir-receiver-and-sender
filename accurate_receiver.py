@@ -37,18 +37,18 @@ errorAllowed = 200
 
 # these variables are for saving the state of your RC to a .json file alongside the bit string data. 
 # make sure they are same as your RC's state.
-temp = 27
-tempChange = 'modekeypress'       # 'up', 'down', 'modekeypress'  did you press the temperature up button or down button, or cooler/heater button?
+temp = 22
+keyPressed = 'testSignal'     # 'up', 'down', 'cool', 'direction'  what button did you press? 
 windSpeed = 2           # 0 to 5, 0 means auto
 mode = 'cool'           # 'warm', 'dehumid', 'cool', 'fan'
 directionToggle = 'no'  # 'yes', 'no'
 timerOff = 0            # 0, 0.5, 1 to 9 in hours
 timerOn = 0             # 0, 0.5, 1 to 12 in hours
-stop = 'no'             # 'yes', 'no'
+stop = 'yes'             # 'yes', 'no'
 
 #---------------------------------------------------------------------------------------------------------------------------------------
 
-ACstatus = [temp, tempChange, windSpeed, mode, directionToggle, timerOff, timerOn, stop]
+ACstatus = [temp, keyPressed, windSpeed, mode, directionToggle, timerOff, timerOn, stop]
 
 # Global variables to store state without slowing down the callback
 last_tick = None
@@ -200,11 +200,11 @@ def main(measurements):
     for i in bitList:
         bitStr += str(i)
 
-    print(bitStr)
+    # print(bitStr)
 
     data = {
         'temp': ACstatus[0], 
-        'tempChange': ACstatus[1],
+        'keyPressed': ACstatus[1],
         'windSpeed': ACstatus[2], 
         'mode': ACstatus[3], 
         'directionToggle': ACstatus[4], 
@@ -272,6 +272,7 @@ def writeDataToFile(file, dict):
 
     with open(file, 'w') as f:
         json.dump(fullData, f, indent=4)
+        print(f"added bit data and RC state info to {file} as {configKey}")
 
 
             
@@ -302,6 +303,6 @@ if __name__ == '__main__':
     data = main(measurements)
 
     # write data to data.json
-    if writeToOutFile == 'yes':
+    if writeToOutFile == 'yes' and data['bitStr_1'] != '':
         writeDataToFile(outFile, data)
 
