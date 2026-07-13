@@ -8,8 +8,10 @@ IR_PIN = 16          # The GPIO pin your IR LED is connected to (BCM numbering)
 FREQ = 38000         # 38 kHz carrier frequency
 
 # NEC Protocol Timings (in microseconds)
-LEADER_MARK = 9000
-LEADER_SPACE = 4500
+LEADER_MARK = 29850
+LEADER_SPACE = 49350
+LEADER_MARK_SECOND = 3450
+LEADER_SPACE_SECOND = 1590
 BIT_MARK = 400
 ZERO_SPACE = BIT_MARK
 ONE_SPACE = 3 * BIT_MARK
@@ -36,6 +38,8 @@ def send_massive_ir_message(pi, payload_bytes, chunk_size=8):
     pulses = []
     add_carrier_burst(pulses, LEADER_MARK)
     add_space(pulses, LEADER_SPACE)
+    add_carrier_burst(pulses, LEADER_MARK_SECOND)
+    add_space(pulses, LEADER_SPACE_SECOND)
     pi.wave_add_generic(pulses)
     leader_wid = pi.wave_create()
     if leader_wid >= 0:
@@ -96,10 +100,7 @@ def send_massive_ir_message(pi, payload_bytes, chunk_size=8):
         for wid in wave_ids:
             pi.wave_delete(wid)
 
-
-
-# --- Main Execution ---
-if __name__ == "__main__":
+def sendSignal(mode, temperature, power):
     # Connect to the pigpio daemon
     pi = pigpio.pi()
     
@@ -113,24 +114,114 @@ if __name__ == "__main__":
     pi.set_mode(IR_PIN, pigpio.OUTPUT)
 
     print("Sending IR Signal...")
+
+    if temperature not in list(range(16, 33)):
+        print(f"error: temperature should be between 16 and 32. currently at \'{temperature}\'.")
+        exit()
+
+    tempHex = temperature * 4
+
+    match mode:
+        case 'cooler':
+            modeHex = 0x23
+        case 'heater':
+            modeHex = 0x26
+        case 'dehumid':
+            modeHex = 0x25
+        case 'fan':
+            modeHex = 0x21
+            tempHex = 0x6c
+        case _:
+            print(f"error: mode \'{mode}\' not recognized. ")
+            exit()
     
-    command = [
-        0x80, 0x08, 0x00, 0x02, 0xfd, 0xff, 0x00, 0x33,
-        0xcc, 0x49, 0xb6, 0xc8
+    match power:
+        case 'off':
+            powerHex = 0xe0
+        case 'on':
+            powerHex = 0xf0
+        case _:
+            print(f"error: power setting \'{power}\' should be either \'on\' or \'off\'.")
+            exit()
+        
+
+    hex_strings = [
+        "0x1",
+        "0x10",
+        "0x0",
+        "0x40",
+        "0xbf",
+        "0xff",
+        "0x0",
+        "0xcc",
+        "0x33",
+        "0x92",
+        "0x6d",
+        "0x13",
+        "0xec",
+        "0x00",         #13 temperature
+        "0x00",         #14 inverse bit
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x00",         #25 fan speed & mode
+        "0x00",         #26 inverse bit
+        "0x00",         #27 power button
+        "0x00",          #28 inverse bit
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x80",
+        "0x7f",
+        "0x3",
+        "0xfc",
+        "0x1",
+        "0xfe",
+        "0x88",
+        "0x77",
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x0",
+        "0xff",
+        "0x0"
     ]
+
+    command = [int(hex_val, 16) for hex_val in hex_strings]
+
+    command[13] = tempHex
+    command[14] = 255 - tempHex
+
+    command[25] = modeHex
+    command[26] = 255 - modeHex
     
-    command_1 = [
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-    ]
+    command[27] = powerHex
+    command[28] = 255 - powerHex
     
-    send_massive_ir_message(pi, command_1, chunk_size=8)
+    send_massive_ir_message(pi, command, chunk_size=8)
+
+    
     
     print("Signal sent successfully.")
 
     # Close connection
     pi.stop()
+
+# --- Main Execution ---
+if __name__ == "__main__":
+
+    sendSignal('heater', 31, 'off')
